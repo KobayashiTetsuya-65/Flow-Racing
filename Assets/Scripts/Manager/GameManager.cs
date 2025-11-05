@@ -1,7 +1,9 @@
 using UnityEngine;
+using UnityEngine.Playables;
 
 public class GameManager : MonoBehaviour
 {
+    [SerializeField] PlayableDirector playableDirector;
     public static GameManager Instance;
     private CarController _carController;
     private CameraMove _cameraMove;
@@ -23,6 +25,10 @@ public class GameManager : MonoBehaviour
     void Update()
     {
         _carController.ControllInput();
+        if (Input.GetMouseButtonDown(0))
+        {
+            playableDirector.Play();
+        }
     }
     private void LateUpdate()
     {
@@ -30,6 +36,10 @@ public class GameManager : MonoBehaviour
     }
     private void FixedUpdate()
     {
-        _carController.CarControll();
+        _carController.CheckGround();
+        _carController.Move();
+        _carController.Rotate();
+        _carController.StickToGround();
+        _carController.UpdateVisuals();
     }
 }

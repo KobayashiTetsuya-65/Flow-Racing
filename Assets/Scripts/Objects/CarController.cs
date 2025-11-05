@@ -1,90 +1,134 @@
 using UnityEngine;
+
 /// <summary>
 /// 車の挙動
 /// </summary>
+[RequireComponent(typeof(Rigidbody))]
 public class CarController : MonoBehaviour
 {
     [Header("基本設定")]
-    [Tooltip("車の重心"),SerializeField] private Transform _centerOfMass;
-    [Tooltip("タイヤ"),SerializeField] private WheelCollider[] _wheels;
-    [Tooltip("パワー"), SerializeField] private float _accelPower = 1000f;
-    [Tooltip("最大ハンドル角度"), SerializeField] private float _handleAngle = 30f;
-    [Tooltip("ブレーキ力"), SerializeField] private float _brakePower = 1000f;
-    [Tooltip("ステア変化スピード"), SerializeField] private float _steerLerpSpeed = 5f;
-    [Tooltip("ドリフトステア乗数"), SerializeField] private float _driftSteerAngle = 1.8f;
-    [Tooltip("ドリフト摩擦係数"), SerializeField] private float _driftFrictionFactor = 0.6f;
-    private Transform[] _visuals;//タイヤの見た目
+    [Tooltip("車のモデル"),SerializeField] private Transform _carModel;
+    [Tooltip("地面を検出する位置"), SerializeField] private Transform _groundCheck;
+
+    [Header("挙動パラメータ")]
+    [SerializeField, Tooltip("最高速度")] private float _maxSpeed = 50f;
+    [SerializeField, Tooltip("加速力")] private float _acceleration = 100f;
+    [SerializeField, Tooltip("旋回スピード")] private float _turnSpeed = 5f;
+    [SerializeField, Tooltip("ドリフト時の旋回倍率")] private float _driftTurnMultiplier = 1.5f;
+    [SerializeField, Tooltip("地面への吸い付き力")] private float _groundStickForce = 30f;
+    [SerializeField, Tooltip("車体の傾き")] private float _tiltAngle = 15f;
+
+    [Header("ブレーキ設定")]
+    [SerializeField, Tooltip("ドリフトブレーキ時の減速率（0.9=少し減速, 0.5=かなり減速）")]
+    private float _driftBrakeFactor = 0.85f;
+
+    [Header("物理設定")]
+    [SerializeField, Tooltip("地面判定距離")] private float _groundRayLength = 1.2f;
+    [SerializeField, Tooltip("地面判定のLayer")] private LayerMask _groundLayer;
+
     private Rigidbody _rb;
-    private Vector3 _pos;
-    private Quaternion _dir;
-    private WheelFrictionCurve _side;
-    private bool _isDrifting;
-    private float _brakeInput,_accelInput,_steerInput,_currentSteer,_steerAngle;
-    private float[] _driveWheels = new float[] { 0f, 0f, 1.0f, 1.0f };
-    private float[] _steerWheels = new float[] { 1.0f, 1.0f, 0f, 0f };
+    private Transform _tr;
+    private bool _isGrounded, _isDrifting;
+    private float _steerInput, _accelInput, _currentSpeed, _speedFactor, _turn, _turnAdjusted, _targetTilt;
+    private Vector3 _groundNormal;
+    private Quaternion _align, _targetRot;
     private void Awake()
     {
-        _wheels = GetComponentsInChildren<WheelCollider>();
+        _tr = GetComponent<Transform>();
         _rb = GetComponent<Rigidbody>();
-        _rb.centerOfMass = _centerOfMass.localPosition;
-        _visuals = new Transform[_wheels.Length];
-        for(int i = 0; i < _wheels.Length; i++)
-        {
-            _visuals[i] = _wheels[i].transform.GetChild(0);
-        }
+        _rb.centerOfMass = Vector3.down * 0.3f; // 少し低めに重心を設定
+        _rb.constraints = RigidbodyConstraints.FreezeRotationZ | RigidbodyConstraints.FreezeRotationX;
     }
-
     /// <summary>
-    /// コントロール時の入力
+    /// 入力処理
     /// </summary>
     public void ControllInput()
     {
-        //基本入力
         _steerInput = Input.GetAxis("Horizontal");
         _accelInput = Input.GetAxis("Vertical");
-        _brakeInput = Input.GetKey(KeyCode.Space) ? _brakePower : 0;
-        _isDrifting = Input.GetKey(KeyCode.RightShift);
-
-        _currentSteer = Mathf.Lerp(_currentSteer, _steerInput, Time.deltaTime * _steerLerpSpeed);
+        _isDrifting = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
     }
     /// <summary>
-    /// 車の挙動演算
+    /// 接地確認処理
     /// </summary>
-    public void CarControll()
+    public void CheckGround()
     {
-        _steerAngle = Mathf.Lerp(_handleAngle,10f, _rb.linearVelocity.magnitude / 40f);
-
-        //ドリフト中の処理
-        if (_isDrifting)
+        if (Physics.Raycast(_groundCheck.position, -_tr.up, out RaycastHit hit, _groundRayLength, _groundLayer))
         {
-            _steerAngle *= _driftSteerAngle;
-            AdjustWheelFriction(_driftFrictionFactor);
+            _isGrounded = true;
+            _groundNormal = hit.normal;
         }
         else
         {
-            AdjustWheelFriction(1f);
-        }
-
-        for (int i = 0; i < _wheels.Length; i++)
-        {
-            _wheels[i].motorTorque = _accelInput * _driveWheels[i] * _accelPower;
-            _wheels[i].steerAngle = _currentSteer * _steerWheels[i] * _handleAngle;
-            _wheels[i].brakeTorque = _brakeInput;
-            _wheels[i].GetWorldPose(out _pos, out _dir);
-            _visuals[i] .position = _pos;
-            _visuals[i].rotation = _dir;
+            _isGrounded = false;
+            _groundNormal = Vector3.up;
         }
     }
     /// <summary>
-    /// 横摩擦の変更
+    /// 前進・減速の処理
     /// </summary>
-    private void AdjustWheelFriction(float factor)
+    public void Move()
     {
-        foreach(var wheel in _wheels)
+        if (!_isGrounded) return;
+
+        _currentSpeed = Vector3.Dot(_rb.linearVelocity, _tr.forward);
+
+        // ドリフト中は速度を少し落とす
+        if (_isDrifting)
         {
-            _side = wheel.sidewaysFriction;
-            _side.stiffness = Mathf.Lerp(_side.stiffness, factor, Time.deltaTime * 5f);
-            wheel.sidewaysFriction = _side;
+            _rb.linearVelocity *= _driftBrakeFactor;
         }
+
+        // 前進力を計算
+        if (Mathf.Abs(_currentSpeed) < _maxSpeed)
+        {
+            _rb.AddForce(_tr.forward * _accelInput * _acceleration, ForceMode.Acceleration);
+        }
+
+        // 空気抵抗
+        _rb.linearVelocity = Vector3.Lerp(_rb.linearVelocity, _rb.linearVelocity * 0.98f, Time.fixedDeltaTime);
+    }
+    /// <summary>
+    /// 旋回・ドリフト処理
+    /// </summary>
+    public void Rotate()
+    {
+        if (!_isGrounded) return;
+
+        _speedFactor = Mathf.Clamp01(_rb.linearVelocity.magnitude / _maxSpeed);
+        _turn = _steerInput * _turnSpeed * (_isDrifting ? _driftTurnMultiplier : 1f);
+
+        // スピードに応じて旋回量を補正
+        _turnAdjusted = _turn * Mathf.Lerp(0.5f, 1f, 1f - _speedFactor * 0.7f);
+        _tr.Rotate(Vector3.up, _turnAdjusted * Time.fixedDeltaTime * 50f);
+    }
+    /// <summary>
+    /// 地面に吸い付ける処理
+    /// </summary>
+    public void StickToGround()
+    {
+        if (_isGrounded)
+        {
+            // 地面の角度に合わせる
+            _align = Quaternion.FromToRotation(_tr.up, _groundNormal) * _tr.rotation;
+            _tr.rotation = Quaternion.Lerp(_tr.rotation, _align, Time.fixedDeltaTime * 10f);
+
+            _rb.AddForce(-_groundNormal * _groundStickForce, ForceMode.Acceleration);
+        }
+        else
+        {
+            _rb.AddForce(Vector3.down * 10f, ForceMode.Acceleration);
+        }
+    }
+    /// <summary>
+    /// 車体の傾き
+    /// </summary>
+    public void UpdateVisuals()
+    {
+        if (_carModel == null) return;
+
+        _targetTilt = -_steerInput * _tiltAngle * (_isDrifting ? 1.3f : 1f);
+        _targetRot = Quaternion.Euler(_carModel.localEulerAngles.x, _carModel.localEulerAngles.y, _targetTilt);
+        _carModel.localRotation = Quaternion.Lerp(_carModel.localRotation, _targetRot, Time.deltaTime * 5f);
     }
 }
