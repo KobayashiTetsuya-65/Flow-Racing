@@ -634,12 +634,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.015531644, y: -0.012215463, z: -0.00018976253, w: 0.99980474}
-  m_LocalPosition: {x: 4.729999, y: 0.109999985, z: -6.025514}
+  m_LocalRotation: {x: -0.010848349, y: -0.7156064, z: -0.011116713, w: 0.69833106}
+  m_LocalPosition: {x: 81.47, y: 0.42, z: -27.8}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 2135415657}
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &330585547
 MonoBehaviour:
@@ -1819,9 +1819,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 1084027289859073575, guid: de4d60cef052cf44599a5d782e4a011e, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1897958195}
-    - targetCorrespondingSourceObject: {fileID: 1084027289859073575, guid: de4d60cef052cf44599a5d782e4a011e, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 330585546}
     - targetCorrespondingSourceObject: {fileID: 3925048430535808452, guid: de4d60cef052cf44599a5d782e4a011e, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1935650040}
@@ -2950,7 +2947,8 @@ MonoBehaviour:
   _driftTurnMultiplier: 1.5
   _groundStickForce: 30
   _tiltAngle: 15
-  _driftBrakeFactor: 0.95
+  _driftBrakeFactor: 0.98
+  _brakeFactor: 0.9
   _groundRayLength: 1.2
   _groundLayer:
     serializedVersion: 2
@@ -2968,6 +2966,7 @@ SceneRoots:
   - {fileID: 832575519}
   - {fileID: 1877305911}
   - {fileID: 1831767797}
+  - {fileID: 330585546}
   - {fileID: 1184732689}
   - {fileID: 751488674}
   - {fileID: 151884434}

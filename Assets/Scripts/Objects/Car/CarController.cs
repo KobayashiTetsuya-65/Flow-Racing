@@ -19,8 +19,10 @@ public class CarController : MonoBehaviour
     [SerializeField, Tooltip("車体の傾き")] private float _tiltAngle = 15f;
 
     [Header("ブレーキ設定")]
-    [SerializeField, Tooltip("ドリフトブレーキ時の減速率（0.9=少し減速, 0.5=かなり減速）")]
+    [SerializeField, Tooltip("ドリフト時の減速率（0.9=少し減速, 0.5=かなり減速）")]
     private float _driftBrakeFactor = 0.85f;
+    [SerializeField, Tooltip("ブレーキ時の減速率")]
+    private float _brakeFactor = 0.7f;
 
     [Header("物理設定")]
     [SerializeField, Tooltip("地面判定距離")] private float _groundRayLength = 1.2f;
@@ -28,7 +30,7 @@ public class CarController : MonoBehaviour
 
     private Rigidbody _rb;
     private Transform _tr;
-    private bool _isGrounded, _isDrifting;
+    private bool _isGrounded, _isDrifting, _isBraking;
     private float _steerInput, _accelInput, _currentSpeed, _speedFactor, _turn, _turnAdjusted, _targetTilt;
     private Vector3 _groundNormal;
     private Quaternion _align, _targetRot;
@@ -46,7 +48,8 @@ public class CarController : MonoBehaviour
     {
         _steerInput = Input.GetAxis("Horizontal");
         _accelInput = Input.GetAxis("Vertical");
-        _isDrifting = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        _isDrifting = Input.GetKey(KeyCode.Space);
+        _isBraking = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
     }
     /// <summary>
     /// 接地確認処理
@@ -73,6 +76,10 @@ public class CarController : MonoBehaviour
 
         _currentSpeed = Vector3.Dot(_rb.linearVelocity, _tr.forward);
 
+        if (_isBraking)
+        {
+            _rb.linearVelocity *= _brakeFactor;
+        }
         // ドリフト中は速度を少し落とす
         if (_isDrifting)
         {
