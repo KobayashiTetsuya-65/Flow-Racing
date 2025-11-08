@@ -25,13 +25,14 @@ public class CarController : MonoBehaviour
     private float _brakeFactor = 0.7f;
 
     [Header("•¨—İ’è")]
+    [SerializeField, Tooltip("Ú’n”»’èŠÔŠu")] private float _groundCheckInterval = 0.1f;
     [SerializeField, Tooltip("’n–Ê”»’è‹——£")] private float _groundRayLength = 1.2f;
     [SerializeField, Tooltip("’n–Ê”»’è‚ÌLayer")] private LayerMask _groundLayer;
 
     private Rigidbody _rb;
     private Transform _tr;
     private bool _isGrounded, _isDrifting, _isBraking;
-    private float _steerInput, _accelInput, _currentSpeed, _speedFactor, _turn, _turnAdjusted, _targetTilt;
+    private float _steerInput, _accelInput, _currentSpeed, _speedFactor, _turn, _turnAdjusted, _targetTilt,_groundCheckTimer = 0;
     private Vector3 _groundNormal;
     private Quaternion _align, _targetRot;
     private void Awake()
@@ -56,15 +57,20 @@ public class CarController : MonoBehaviour
     /// </summary>
     public void CheckGround()
     {
-        if (Physics.Raycast(_groundCheck.position, -_tr.up, out RaycastHit hit, _groundRayLength, _groundLayer))
+        _groundCheckTimer += Time.deltaTime;
+        if(_groundCheckInterval <= _groundCheckTimer)
         {
-            _isGrounded = true;
-            _groundNormal = hit.normal;
-        }
-        else
-        {
-            _isGrounded = false;
-            _groundNormal = Vector3.up;
+            _isGrounded = Physics.CheckSphere(_groundCheck.position, 0.8f, _groundLayer);
+            if (_isGrounded)
+            {
+                Physics.Raycast(_groundCheck.position, -_tr.up, out RaycastHit hit, _groundRayLength, _groundLayer);
+                _groundNormal = hit.normal;
+            }
+            else
+            {
+                _groundNormal = Vector3.up;
+            }
+            _groundCheckTimer = 0;
         }
     }
     /// <summary>
